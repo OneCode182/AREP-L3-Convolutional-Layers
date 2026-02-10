@@ -21,7 +21,6 @@
 - [Theoretical Background](#theoretical-background)
 - [Implementation](#implementation)
 - [Results](#results)
-- [AWS SageMaker Deployment](#aws-sagemaker-deployment)
 - [Interpretation](#interpretation)
 - [References](#references)
 - [Author](#author)
@@ -108,6 +107,14 @@ jupyter notebook lab03_cnn_fashion_mnist.ipynb
 - Classic MNIST is essentially solved (~99% achievable) — not enough headroom to observe architectural differences.
 - Fashion-MNIST has overlapping categories (Shirt vs Coat vs Pullover) that require spatial feature extraction to distinguish — exactly the scenario where convolutions should shine.
 
+### Data Visualization
+
+| Sample Images | Mean Intensity per Class |
+|:---:|:---:|
+| ![Samples](src/img/sample_images.png) | ![Mean Images](src/img/mean_images.png) |
+
+> **Insight:** The mean images (right) show clear ghosts of the shapes (e.g., the vertical legs of trousers), confirming that there is significant spatial structure to exploit—perfect for convolutions.
+
 ---
 
 ## Theoretical Background
@@ -193,18 +200,32 @@ Flatten(64×7×7) → Linear(128) → ReLU → Linear(10)
 3. **Larger kernels hurt** — on 28×28 images, 7×7 covers 25% of the width in one step, losing fine details.
 4. **Biggest CNN gains** are on visually similar classes (Shirt/Coat/Pullover) where local texture features are discriminative.
 
+### Training Dynamics
+
+| Baseline MLP Training | CNN (3x3) Training |
+|:---:|:---:|
+| ![Baseline Training](src/img/baseline_training.png) | ![CNN Training](src/img/cnn_training.png) |
+
+> **Analysis:** The CNN (right) achieves higher accuracy with less overfitting divergence compared to the Baseline MLP (left), confirming that the architectural constraints act as a regularizer.
+
 ### Confusion Matrix
 
 ![CNN Confusion Matrix](src/img/cnn_confusion_matrix.png)
 
 ---
 
+## Feature Map Visualization (Bonus)
+
+To understand what the network learns, we visualize the internal activations (feature maps) for a test image.
+
+![Feature Maps](src/img/feature_maps.png)
+
+> **Conv1 (Top):** Detects low-level features like edges and gradients.
+> **Conv2 (Bottom):** Combines these into higher-level representations (shapes, textures).
+
+---
+
 ## AWS SageMaker Deployment
-
-> [!TIP]
-> See the notebook for local training results. SageMaker deployment evidence is documented below.
-
-<!-- TODO: Add SageMaker screenshots after deployment -->
 <!-- 
 | Step | Evidence |
 |:-----|:---------|
@@ -217,23 +238,29 @@ Flatten(64×7×7) → Linear(128) → ReLU → Linear(10)
 
 ## Interpretation
 
-### Why did convolutional layers outperform (or not) the baseline?
+### 1. Why did convolutional layers outperform (or not) the baseline?
 
-**Your response:**
+**Convolutional Neural Networks (CNNs)** outperformed **Multi-Layer Perceptrons (MLPs)** because leveraging spatial structure is fundamental. While the base model **"flattens"** the $28 \times 28$ image into a 784-dimensional vector—eliminating any concept of neighborhood relationships between pixels—the CNN operates on the image itself as a **2D grid**. 
 
-<Add your reasoning here. Include evidence from your results, specific failure modes of the MLP, and what spatial features the CNN can capture.>
+The model is capable of detecting **robust visual patterns** (the curvature of a shoe sole, a shirt collar, etc.), given that small differences in the position of these patterns do not modify the final output of the convolution. This is something an MLP cannot achieve unless its network architecture is massively overhauled.
 
 ### What inductive bias does convolution introduce, and how does it align with this dataset?
 
-**Your response:**
+Convolutional operations contain three main inductive biases that are in line with the properties of Fashion-MNIST images. 
 
-<Explain locality, translation equivariance, and hierarchical composition in your own words. Connect each point to observations from Fashion-MNIST.>
+1. Locality - Assumes the correlation of pixels within close proximity (e.g. pixels in a group represent a critical element of a garment such as a button or a seam), with much higher correlation than pixels that are far apart from each other.
+2. Translation Equivariance - Recognizes how a specific visual element (e.g. sleeve) can be present at different locations in the photo and still represent "the same thing." The model uses the same filter to identify these elements regardless of their location and will therefore share the same weight for that filter.
+3. Hierarchical - Stacking layers builds representations that become more complex (items) by using many simple items (edges and textures), thereby imitating the composition of objects in the physical world.
 
 ### In what types of problems would convolution NOT be appropriate?
 
-**Your response:**
+When the properties of an object don't allow for the presence of regular layout or a consistent geographical area, convolution will not work:
 
-<List at least two problem types. For each, explain which convolution assumption is violated and what alternative model class is more suitable.>
+- For example, if you have a dataset of different customers and use table fields like age, salary, and debts but the order of those fields in the table does not matter. The 'neighborhood' of the age and salary columns does not form any spatial relationship so the neighborhood of those columns is also not spatially related and you will not find any local patterns through convolution.
+
+- In a different case, social networks and molecules take on different forms (i.e. nodes) and therefore number of neighbors varies for each one. In these cases, a **GNN** model can generalize convolution to non-Euclidean spaces.
+
+- As in **NLP** for example, recent advances in transformer models have allowed them to replace **CNNs** because the meaning of one word depends on another very far away, but using the attention method to model long distance relationships is much better than using the limited receptive field of a convolutional operation.
 
 ---
 
